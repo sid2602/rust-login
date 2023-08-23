@@ -4,7 +4,7 @@ mod config;
 use actix_web::{web, App, HttpServer};
 use sqlx::{Pool, Postgres};
 use dotenv::dotenv;
-use customers::endpoints::{create_customer,get_customer,get_customers,delete_customer};
+use customers::endpoints::{create_customer_endpoint,get_customer_endpoint,get_customers_endpoint,delete_customer_endpoint};
 use crate::config::postgres::create_postgres_pool;
 
 pub struct AppState {
@@ -23,10 +23,10 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(AppState {db: pool.clone()}))
-            .service(create_customer)
-            .service(get_customers)
-            .service(get_customer)
-            .service(delete_customer)
+            .service(create_customer_endpoint)
+            .service(get_customers_endpoint)
+            .service(get_customer_endpoint)
+            .service(delete_customer_endpoint)
     })
     .bind(("127.0.0.1", 8080))?
     .run()

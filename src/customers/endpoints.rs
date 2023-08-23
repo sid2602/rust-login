@@ -1,9 +1,8 @@
 use actix_web::{get, post, delete, web, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use super::customer::Customer;
 
-use crate::AppState;
+use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customers, get_customer, delete_customer}};
 #[derive( Deserialize, Serialize, Debug)]
 pub struct NewCustomer {
     pub username: String,
@@ -11,35 +10,16 @@ pub struct NewCustomer {
 }
 
 #[post("/customers")]
-pub async fn create_customer(
+pub async fn create_customer_endpoint(
     body: web::Json<NewCustomer>,
     data: web::Data<AppState>
 ) -> impl Responder {
-
-    let user_id: Uuid = Uuid::new_v4();
     let username = body.username.clone();
     let password = body.password.clone();
 
-    let query_result = sqlx::query!(r#"INSERT INTO customers (id,username,password) VALUES ($1,$2,$3)"#,
-    user_id,
-    username,
-    password
-    )
-        .execute(&data.db)
-        .await
-        .map_err(|err: sqlx::Error| err.to_string());
+    let customer = create_customer(CreateCustomerSchema{username,password}, &data.db).await;
 
-
-    if let Err(err) = query_result {
-        return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", err)}));
-    }
-
-    let query_result = sqlx::query_as!(Customer, r#"SELECT * FROM customers where id = $1"#, user_id)
-        .fetch_one(&data.db)
-        .await;
-
-    match query_result {
+    match customer {
         Ok(customer) => {
             return HttpResponse::Ok().json(customer)
         }
@@ -48,21 +28,18 @@ pub async fn create_customer(
             .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
         }
     }
-
-
 }
 
 #[get("/customers")]
-pub async fn get_customers(
+pub async fn get_customers_endpoint(
     data: web::Data<AppState>
 ) -> impl Responder {
-    let query_result = sqlx::query_as!(Customer, r#"SELECT * FROM customers"#)
-    .fetch_all(&data.db)
-    .await;
 
-    match query_result {
-        Ok(customer) => {
-            return HttpResponse::Ok().json(customer)
+    let customers = get_customers(&data.db).await;
+
+    match customers {
+        Ok(customers) => {
+            return HttpResponse::Ok().json(customers)
         }
         Err(e) => {
             return HttpResponse::InternalServerError()
@@ -72,17 +49,15 @@ pub async fn get_customers(
 }
 
 #[get("/customers/{user_id}")]
-pub async fn get_customer(
+pub async fn get_customer_endpoint(
     path: web::Path<Uuid>,
     data: web::Data<AppState>
 ) -> impl Responder {
     let user_id = path.into_inner();
 
-    let query_result = sqlx::query_as!(Customer, r#"SELECT * FROM customers WHERE id = $1"#, user_id)
-    .fetch_one(&data.db)
-    .await;
+    let customer = get_customer(user_id,&data.db).await;
 
-    match query_result {
+    match customer {
         Ok(customer) => {
             return HttpResponse::Ok().json(customer)
         }
@@ -94,20 +69,17 @@ pub async fn get_customer(
 }
 
 #[delete("/customers/{user_id}")]
-pub async fn delete_customer(
+pub async fn delete_customer_endpoint(
     path: web::Path<Uuid>,
     data: web::Data<AppState>
 ) -> impl Responder {
     let user_id = path.into_inner();
 
-    let query_result = sqlx::query!(r#"DELETE FROM customers WHERE id = $1"#, user_id)
-    .execute(&data.db)
-    .await;
+    let delete_result = delete_customer(user_id,&data.db).await;
 
-
-    match query_result {
-        Ok(_result) => {
-            return HttpResponse::Ok().json(serde_json::json!({"message": "ok"}));
+    match delete_result {
+        Ok(result) => {
+            return HttpResponse::Ok().json(serde_json::json!({"message": result}));
         }
         Err(e) => {
             return HttpResponse::InternalServerError()
