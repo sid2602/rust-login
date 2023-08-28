@@ -7,7 +7,7 @@ pub struct CreateCustomerSchema {
     pub password: String
 }
 
-#[derive( Deserialize, Serialize, Debug)]
+#[derive( Deserialize, Serialize, Debug, Clone)]
 pub struct Customer {
     pub id: Uuid,
     pub username: String,
@@ -19,6 +19,15 @@ pub async fn get_customer(
     pg_pool: &Pool<Postgres>
 ) -> Result<Customer, Error> {
     sqlx::query_as!(Customer, r#"SELECT * FROM customers WHERE id = $1"#, user_id)
+    .fetch_one(pg_pool)
+    .await
+}
+
+pub async fn get_customer_by_username(
+    username: String,
+    pg_pool: &Pool<Postgres>
+) -> Result<Customer, Error> {
+    sqlx::query_as!(Customer, r#"SELECT * FROM customers WHERE username = $1"#, username)
     .fetch_one(pg_pool)
     .await
 }
@@ -63,7 +72,6 @@ pub async fn delete_customer(
     let query_result = sqlx::query!(r#"DELETE FROM customers WHERE id = $1"#, user_id)
     .execute(pg_pool)
     .await;
-
 
     if let Err(e) = query_result {
         return Err(e);
