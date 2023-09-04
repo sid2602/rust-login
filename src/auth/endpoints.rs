@@ -1,7 +1,7 @@
-use actix_web::{post, web, HttpResponse, Responder};
+use actix_web::{post, get, web, HttpResponse, Responder};
 use serde::{Deserialize, Serialize};
 
-use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customer_by_username,}, auth::{auth::{check_password_is_valid_when_register, hash_password, is_password_valid_with_hashed_password}, jwt::{create_token, set_token_in_cookies, remove_token_from_cookies}}};
+use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customer_by_username, get_customer,}, auth::{auth::{check_password_is_valid_when_register, hash_password, is_password_valid_with_hashed_password}, jwt::{create_token, set_token_in_cookies, remove_token_from_cookies}, middlewares::jwt_middleware::JwtMiddleware}};
 
 #[derive( Deserialize, Serialize, Debug)]
 pub struct RegisterCustomerSchema {
@@ -90,12 +90,32 @@ pub async fn login_customer_endpoint(
     .json(serde_json::json!({"status": "error","message": format!("{:?}", "Wrong username or password")}))
 }
 
-#[post("/auth/logout")]
-pub async fn logout_customer_endpoint() -> impl Responder {
+#[get("/auth/logout")]
+pub async fn logout_customer_endpoint(
+    _: JwtMiddleware
+) -> impl Responder {
 
     let cookie = remove_token_from_cookies();
 
     HttpResponse::InternalServerError()
     .cookie(cookie)
     .json(serde_json::json!({"status": "success"}))
+}
+
+#[get("/auth/me")]
+pub async fn get_me_endpoint(
+    data: web::Data<AppState>,
+    jwt: JwtMiddleware
+) -> impl Responder {
+    let customer = get_customer(jwt.user_id, &data.db).await;
+
+    match customer {
+        Ok(customer) => {
+            return HttpResponse::Ok().json(customer)
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError()
+            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+        }
+    }
 }
