@@ -1,23 +1,21 @@
 use actix_web::{get, post, delete, web, HttpResponse, Responder};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customers, get_customer, delete_customer}};
-#[derive( Deserialize, Serialize, Debug)]
-pub struct NewCustomer {
-    pub username: String,
-    pub password: String
-}
+
 
 #[post("/customers")]
 pub async fn create_customer_endpoint(
-    body: web::Json<NewCustomer>,
+    body: web::Json<CreateCustomerSchema>,
     data: web::Data<AppState>
 ) -> impl Responder {
-    let username = body.username.clone();
+    let firstname = body.firstname.clone();
+    let lastname = body.lastname.clone();
+    let email = body.email.clone();
     let password = body.password.clone();
+    let role = body.role.clone();
 
-    let customer = create_customer(CreateCustomerSchema{username,password}, &data.db).await;
+    let customer = create_customer(CreateCustomerSchema{firstname,lastname,email,password,role}, &data.db).await;
 
     match customer {
         Ok(customer) => {
