@@ -1302,6 +1302,7 @@ dependencies = [
  "actix-web",
  "chrono",
  "dotenv",
+ "futures-util",
  "jsonwebtoken",
  "pwhash",
  "serde",

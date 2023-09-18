@@ -32,7 +32,6 @@ pub async fn create_customer_endpoint(
 pub async fn get_customers_endpoint(
     data: web::Data<AppState>
 ) -> impl Responder {
-
     let customers = get_customers(&data.db).await;
 
     match customers {
