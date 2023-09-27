@@ -1,7 +1,29 @@
-use actix_web::{post, get, web, HttpResponse, Responder, HttpRequest, HttpMessage};
+use actix_web::{web, HttpResponse, Responder, HttpRequest, HttpMessage, Scope};
 use serde::{Deserialize, Serialize};
 
 use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customer_by_email, CustomerRole, Customer,}, auth::{auth::{check_password_is_valid_when_register, hash_password, is_password_valid_with_hashed_password}, jwt::{create_token, set_token_in_cookies, remove_token_from_cookies}}};
+
+use super::middlewares::auth_middleware::RequireAuth;
+
+
+pub fn auth_scope() -> Scope {
+    web::scope("/auth")
+        .route("/register", web::post().to(register_customer_endpoint))
+        .route("/login", web::post().to(login_customer_endpoint))
+        .route(
+            "/logout",
+            web::get().to(logout_customer_endpoint).wrap(RequireAuth::allowed_roles(vec![
+                CustomerRole::Admin, CustomerRole::Staff, CustomerRole::Viewer,
+            ])),
+        )
+        .route(
+            "/me",
+            web::get().to(get_me_endpoint).wrap(RequireAuth::allowed_roles(vec![
+                CustomerRole::Admin, CustomerRole::Staff, CustomerRole::Viewer,
+            ])),
+        )
+}
+
 
 #[derive( Deserialize, Serialize, Debug)]
 pub struct RegisterCustomerSchema {
@@ -12,7 +34,6 @@ pub struct RegisterCustomerSchema {
     pub repeated_password: String,
 }
 
-#[post("/auth/register")]
 pub async fn register_customer_endpoint(
     body: web::Json<RegisterCustomerSchema>,
     data: web::Data<AppState>
@@ -62,7 +83,6 @@ pub struct LoginCustomerSchema {
     pub password: String,
 }
 
-#[post("/auth/login")]
 pub async fn login_customer_endpoint(
     body: web::Json<LoginCustomerSchema>,
     data: web::Data<AppState>
@@ -94,7 +114,6 @@ pub async fn login_customer_endpoint(
     .json(serde_json::json!({"status": "error","message": format!("{:?}", "Wrong username or password")}))
 }
 
-#[get("/auth/logout")]
 pub async fn logout_customer_endpoint() -> impl Responder {
 
     let cookie = remove_token_from_cookies();
@@ -104,7 +123,6 @@ pub async fn logout_customer_endpoint() -> impl Responder {
     .json(serde_json::json!({"status": "success"}))
 }
 
-#[get("/me")]
 pub async fn get_me_endpoint(
     req: HttpRequest,
 ) -> impl Responder {

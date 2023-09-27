@@ -1,10 +1,35 @@
-use actix_web::{get, post, delete, web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse, Responder, Scope};
 use uuid::Uuid;
 
-use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customers, get_customer, delete_customer}};
+use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customers, get_customer, delete_customer}, auth::middlewares::auth_middleware::RequireAuth};
+
+use super::customer::CustomerRole;
 
 
-#[post("/customers")]
+pub fn customer_scope() -> Scope {
+    web::scope("/customers")
+        .route("",
+            web::post().to(create_customer_endpoint).wrap(RequireAuth::allowed_roles(vec![
+            CustomerRole::Admin, CustomerRole::Staff
+        ])))
+        .route("",
+         web::get().to(get_customers_endpoint).wrap(RequireAuth::allowed_roles(vec![
+            CustomerRole::Admin, CustomerRole::Staff
+        ])))
+        .route(
+            "/{user_id}",
+            web::get().to(get_customer_endpoint).wrap(RequireAuth::allowed_roles(vec![
+                CustomerRole::Admin, CustomerRole::Staff
+            ])),
+        )
+        .route(
+            "",
+            web::delete().to(delete_customer_endpoint).wrap(RequireAuth::allowed_roles(vec![
+                CustomerRole::Admin, CustomerRole::Staff
+            ])),
+        )
+}
+
 pub async fn create_customer_endpoint(
     body: web::Json<CreateCustomerSchema>,
     data: web::Data<AppState>
@@ -28,7 +53,6 @@ pub async fn create_customer_endpoint(
     }
 }
 
-#[get("/customers")]
 pub async fn get_customers_endpoint(
     data: web::Data<AppState>
 ) -> impl Responder {
@@ -45,7 +69,6 @@ pub async fn get_customers_endpoint(
     }
 }
 
-#[get("/customers/{user_id}")]
 pub async fn get_customer_endpoint(
     path: web::Path<Uuid>,
     data: web::Data<AppState>
@@ -65,7 +88,6 @@ pub async fn get_customer_endpoint(
     }
 }
 
-#[delete("/customers/{user_id}")]
 pub async fn delete_customer_endpoint(
     path: web::Path<Uuid>,
     data: web::Data<AppState>
