@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Responder, HttpRequest, HttpMessage, Scope};
 use serde::{Deserialize, Serialize};
 
-use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customer_by_email, CustomerRole, Customer,}, auth::{auth::{check_password_is_valid_when_register, hash_password, is_password_valid_with_hashed_password}, jwt::{create_token, set_token_in_cookies, remove_token_from_cookies}}};
+use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customer_by_email, CustomerRole, Customer,}, auth::{auth::{check_password_is_valid_when_register, hash_password, is_password_valid_with_hashed_password}, jwt::{create_token, set_token_in_cookies, remove_token_from_cookies}}, config::ErrorResponse::{ErrorResponse, ErrorStatus}};
 
 use super::middlewares::auth_middleware::RequireAuth;
 
@@ -37,7 +37,8 @@ pub struct RegisterCustomerSchema {
 pub async fn register_customer_endpoint(
     body: web::Json<RegisterCustomerSchema>,
     data: web::Data<AppState>
-) -> impl Responder {
+) -> Result<HttpResponse<actix_web::body::BoxBody>, ErrorResponse> {
+
     let email = body.email.clone();
     let firstname = body.firstname.clone();
     let lastname = body.lastname.clone();
@@ -49,8 +50,7 @@ pub async fn register_customer_endpoint(
            password
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+             return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e});
         }
     };
 
@@ -59,8 +59,7 @@ pub async fn register_customer_endpoint(
             hashed_password
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e});
         }
     };
 
@@ -68,11 +67,10 @@ pub async fn register_customer_endpoint(
 
     match customer {
         Ok(customer) => {
-            return HttpResponse::Ok().json(customer)
+            return Ok(HttpResponse::Ok().json(customer));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e.to_string()});
         }
     }
 }
