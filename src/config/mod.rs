@@ -1,3 +1,3 @@
 pub mod config;
 pub mod postgres;
-pub mod ErrorResponse;
+pub mod error_response;
