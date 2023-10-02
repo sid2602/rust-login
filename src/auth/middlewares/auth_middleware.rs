@@ -4,25 +4,13 @@ use actix_web::{http, web, HttpMessage};
 use futures_util::FutureExt;
 use futures_util::future::{ready, LocalBoxFuture, Ready};
 use jsonwebtoken::{DecodingKey, decode, Validation};
-use serde::Serialize;
 use uuid::Uuid;
 use std::rc::Rc;
 use std::task::Poll;
 use crate::AppState;
 use crate::auth::jwt::TokenClaims;
+use crate::config::error_response::{ErrorResponse, ErrorStatus};
 use crate::customers::customer::{CustomerRole, get_customer, Customer};
-
-#[derive(Debug, Serialize)]
-struct ErrorResponse{
-    status: String,
-    message: String
-}
-
-impl std::fmt::Display for ErrorResponse{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", serde_json::to_string(&self).unwrap())
-    }
-}
 
 pub struct RequireAuth {
     pub allowed_roles: Rc<Vec<CustomerRole>>
@@ -90,7 +78,7 @@ where
 
         if token.is_none() {
             let json_error = ErrorResponse {
-                status: "fail".to_string(),
+                status: ErrorStatus::Unauthorized,
                 message: "You are not logged in, please provide token".to_string(),
             };
             return Box::pin(ready(Err(ErrorUnauthorized(json_error))));
@@ -104,7 +92,7 @@ where
             Ok(c) => c.claims,
             Err(_) => {
                 let json_error = ErrorResponse {
-                    status: "fail".to_string(),
+                    status: ErrorStatus::Unauthorized,
                     message: "Invalid token".to_string(),
                 };
                 return Box::pin(ready(Err(ErrorUnauthorized(json_error))));
@@ -122,7 +110,7 @@ where
                 Ok(customer) => customer,
                 Err(_) => {
                     return Err(ErrorUnauthorized(ErrorResponse {
-                        status: "fail".to_string(),
+                        status: ErrorStatus::Unauthorized,
                         message: "User not exists".to_string()
                     }))
                 }
@@ -137,8 +125,8 @@ where
             } else {
 
                 Err(ErrorUnauthorized(ErrorResponse {
-                    status: "fail".to_string(),
-                    message: "fail".to_string()
+                    status: ErrorStatus::BadRequest,
+                    message: "failed with jwt check".to_string()
                 }))
             }
 

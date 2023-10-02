@@ -1,7 +1,7 @@
-use actix_web::{web, HttpResponse, Responder, Scope};
+use actix_web::{web, HttpResponse, Scope};
 use uuid::Uuid;
 
-use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customers, get_customer, delete_customer}, auth::middlewares::auth_middleware::RequireAuth};
+use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customers, get_customer, delete_customer}, auth::middlewares::auth_middleware::RequireAuth, config::{error_response::{ErrorResponse, ErrorStatus}, custom_response::{CustomResponse, CustomResponseEmptyData}}};
 
 use super::customer::CustomerRole;
 
@@ -14,7 +14,7 @@ pub fn customer_scope() -> Scope {
         ])))
         .route("",
          web::get().to(get_customers_endpoint).wrap(RequireAuth::allowed_roles(vec![
-            CustomerRole::Admin, CustomerRole::Staff
+            CustomerRole::Admin, CustomerRole::Staff, CustomerRole::Viewer
         ])))
         .route(
             "/{user_id}",
@@ -33,7 +33,7 @@ pub fn customer_scope() -> Scope {
 pub async fn create_customer_endpoint(
     body: web::Json<CreateCustomerSchema>,
     data: web::Data<AppState>
-) -> impl Responder {
+) -> Result<HttpResponse, ErrorResponse>  {
     let firstname = body.firstname.clone();
     let lastname = body.lastname.clone();
     let email = body.email.clone();
@@ -44,27 +44,25 @@ pub async fn create_customer_endpoint(
 
     match customer {
         Ok(customer) => {
-            return HttpResponse::Ok().json(customer)
+            return Ok(HttpResponse::Ok().json(CustomResponse::new(customer)));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e.to_string()});
         }
     }
 }
 
 pub async fn get_customers_endpoint(
     data: web::Data<AppState>
-) -> impl Responder {
+) -> Result<HttpResponse, ErrorResponse>  {
     let customers = get_customers(&data.db).await;
 
     match customers {
         Ok(customers) => {
-            return HttpResponse::Ok().json(customers)
+            return Ok(HttpResponse::Ok().json(CustomResponse::new(customers)));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e.to_string()});
         }
     }
 }
@@ -72,18 +70,17 @@ pub async fn get_customers_endpoint(
 pub async fn get_customer_endpoint(
     path: web::Path<Uuid>,
     data: web::Data<AppState>
-) -> impl Responder {
+) -> Result<HttpResponse, ErrorResponse> {
     let user_id = path.into_inner();
 
     let customer = get_customer(user_id,&data.db).await;
 
     match customer {
         Ok(customer) => {
-            return HttpResponse::Ok().json(customer)
+            return Ok(HttpResponse::Ok().json(CustomResponse::new(customer)));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e.to_string()});
         }
     }
 }
@@ -91,18 +88,17 @@ pub async fn get_customer_endpoint(
 pub async fn delete_customer_endpoint(
     path: web::Path<Uuid>,
     data: web::Data<AppState>
-) -> impl Responder {
+) -> Result<HttpResponse<actix_web::body::BoxBody>, ErrorResponse>  {
     let user_id = path.into_inner();
 
     let delete_result = delete_customer(user_id,&data.db).await;
 
     match delete_result {
-        Ok(result) => {
-            return HttpResponse::Ok().json(serde_json::json!({"message": result}));
+        Ok(_result) => {
+            return Ok(HttpResponse::Ok().json(CustomResponse::new(CustomResponseEmptyData{})));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e.to_string()});
         }
     }
 }

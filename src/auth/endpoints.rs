@@ -1,7 +1,7 @@
-use actix_web::{web, HttpResponse, Responder, HttpRequest, HttpMessage, Scope};
+use actix_web::{web, HttpResponse, HttpRequest, HttpMessage, Scope};
 use serde::{Deserialize, Serialize};
 
-use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customer_by_email, CustomerRole, Customer,}, auth::{auth::{check_password_is_valid_when_register, hash_password, is_password_valid_with_hashed_password}, jwt::{create_token, set_token_in_cookies, remove_token_from_cookies}}};
+use crate::{AppState, customers::customer::{create_customer, CreateCustomerSchema, get_customer_by_email, CustomerRole, Customer,}, auth::{auth::{check_password_is_valid_when_register, hash_password, is_password_valid_with_hashed_password}, jwt::{create_token, set_token_in_cookies, remove_token_from_cookies}}, config::{error_response::{ErrorResponse, ErrorStatus}, custom_response::{CustomResponse, CustomResponseEmptyData}}};
 
 use super::middlewares::auth_middleware::RequireAuth;
 
@@ -37,7 +37,8 @@ pub struct RegisterCustomerSchema {
 pub async fn register_customer_endpoint(
     body: web::Json<RegisterCustomerSchema>,
     data: web::Data<AppState>
-) -> impl Responder {
+) -> Result<HttpResponse, ErrorResponse> {
+
     let email = body.email.clone();
     let firstname = body.firstname.clone();
     let lastname = body.lastname.clone();
@@ -49,8 +50,7 @@ pub async fn register_customer_endpoint(
            password
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+             return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e});
         }
     };
 
@@ -59,8 +59,7 @@ pub async fn register_customer_endpoint(
             hashed_password
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e});
         }
     };
 
@@ -68,11 +67,10 @@ pub async fn register_customer_endpoint(
 
     match customer {
         Ok(customer) => {
-            return HttpResponse::Ok().json(customer)
+            return Ok(HttpResponse::Ok().json(CustomResponse::new(customer)));
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e.to_string()});
         }
     }
 }
@@ -83,10 +81,15 @@ pub struct LoginCustomerSchema {
     pub password: String,
 }
 
+#[derive(Serialize)]
+pub struct LoginCustomerResponse {
+    jwt: String
+}
+
 pub async fn login_customer_endpoint(
     body: web::Json<LoginCustomerSchema>,
     data: web::Data<AppState>
-) -> impl Responder {
+) -> Result<HttpResponse, ErrorResponse> {
     let email = body.email.clone();
     let password = body.password.clone();
 
@@ -95,8 +98,7 @@ pub async fn login_customer_endpoint(
            customer
         }
         Err(e) => {
-            return HttpResponse::InternalServerError()
-            .json(serde_json::json!({"status": "error","message": format!("{:?}", e)}));
+            return Err(ErrorResponse{status: ErrorStatus::InternalServerError, message: e.to_string()});
         }
     };
 
@@ -107,33 +109,30 @@ pub async fn login_customer_endpoint(
     let cookie = set_token_in_cookies(token.clone());
 
     if is_password_correct {
-        return HttpResponse::Ok().cookie(cookie).json(serde_json::json!({"jwt": token}))
+        return Ok(HttpResponse::Ok().cookie(cookie).json(CustomResponse::new(LoginCustomerResponse{jwt: token})));
     }
 
-    HttpResponse::InternalServerError()
-    .json(serde_json::json!({"status": "error","message": format!("{:?}", "Wrong username or password")}))
+    return Err(ErrorResponse{status: ErrorStatus::Unauthorized, message: "Wrong username or password".to_string()});
 }
 
-pub async fn logout_customer_endpoint() -> impl Responder {
+pub async fn logout_customer_endpoint() -> Result<HttpResponse<actix_web::body::BoxBody>, ErrorResponse> {
 
-    let cookie = remove_token_from_cookies();
+    let _cookie = remove_token_from_cookies();
 
-    HttpResponse::InternalServerError()
-    .cookie(cookie)
-    .json(serde_json::json!({"status": "success"}))
+    return Ok(HttpResponse::Ok()
+    .json(CustomResponse::new(CustomResponseEmptyData{})));
 }
 
 pub async fn get_me_endpoint(
     req: HttpRequest,
-) -> impl Responder {
+) -> Result<HttpResponse, ErrorResponse>  {
 
     match req.extensions().get::<Customer>() {
         Some(customer) => {
-            return HttpResponse::Ok().json(customer)
+            return Ok(HttpResponse::Ok().json(CustomResponse::new(customer)))
         },
         None => {
-            return HttpResponse::InternalServerError()
-                .json(serde_json::json!({"status": "error","message": "Invalid customer with this jwt"}));
+            return Err(ErrorResponse{status: ErrorStatus::Unauthorized, message: "Invalid customer with this jwt".to_string()});
         }
     }
 }
