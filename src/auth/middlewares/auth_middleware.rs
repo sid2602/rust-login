@@ -4,7 +4,6 @@ use actix_web::{http, web, HttpMessage};
 use futures_util::FutureExt;
 use futures_util::future::{ready, LocalBoxFuture, Ready};
 use jsonwebtoken::{DecodingKey, decode, Validation};
-use serde::Serialize;
 use uuid::Uuid;
 use std::rc::Rc;
 use std::task::Poll;
@@ -12,18 +11,6 @@ use crate::AppState;
 use crate::auth::jwt::TokenClaims;
 use crate::config::error_response::{ErrorResponse, ErrorStatus};
 use crate::customers::customer::{CustomerRole, get_customer, Customer};
-
-// #[derive(Debug, Serialize)]
-// struct ErrorResponse{
-//     status: String,
-//     message: String
-// }
-
-// impl std::fmt::Display for ErrorResponse{
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "{}", serde_json::to_string(&self).unwrap())
-//     }
-// }
 
 pub struct RequireAuth {
     pub allowed_roles: Rc<Vec<CustomerRole>>
